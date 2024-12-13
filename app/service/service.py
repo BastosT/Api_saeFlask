@@ -1,33 +1,50 @@
-# import requests
-# from influxdb_client import InfluxDBClient, Point, WritePrecision
-# from influxdb_client.client.write_api import SYNCHRONOUS
+# from influxdb_client import InfluxDBClient
+# import time
 
-# def get_data_from_raspberry():
-#     """Simuler une récupération de données depuis la Raspberry Pi"""
-#     # Exemple de données : remplacer par votre logique réelle
-#     return {
-#         "temperature": 22.5,
-#         "humidity": 55.2,
-#         "timestamp": "2024-11-22T10:00:00Z"
-#     }
+# # Paramètres InfluxDB locale
+# local_url = "http://localhost:8086"
+# local_token = "Votre_Token_Local"
+# local_org = "Votre_Organisation_Local"
+# local_bucket = "Votre_Bucket_Local"
 
-# def write_to_influxdb(data):
-#     """Écrire des données dans InfluxDB"""
-#     client = InfluxDBClient(
-#         url="https://your-ovh-instance.com",
-#         token="votre_token_influxdb",
-#         org="votre_organisation"
-#     )
-#     write_api = client.write_api(write_options=SYNCHRONOUS)
-#     bucket = "votre_bucket"
-    
-#     # Créer un point pour InfluxDB
-#     point = Point("sensor_data") \
-#         .tag("location", "raspberry_pi") \
-#         .field("temperature", data["temperature"]) \
-#         .field("humidity", data["humidity"]) \
-#         .time(data["timestamp"], WritePrecision.NS)
-    
-#     # Écrire dans InfluxDB
-#     write_api.write(bucket=bucket, org="votre_organisation", record=point)
-#     client.close()
+# # Paramètres InfluxDB OVH (distante)
+# remote_url = "https://eu-west-1-1.aws.cloud2.influxdata.com"
+# remote_token = "Votre_Token_OVH"
+# remote_org = "Votre_Organisation_OVH"
+# remote_bucket = "Votre_Bucket_OVH"
+
+# latest_data = []
+
+# # Récupérer les données de l'InfluxDB locale
+# def fetch_influx_data():
+#     global latest_data
+#     client = InfluxDBClient(url=local_url, token=local_token, org=local_org)
+#     query = f'''
+#     from(bucket: "{local_bucket}")
+#       |> range(start: -1h)
+#     '''
+#     while True:
+#         result = client.query_api().query(query, org=local_org)
+#         latest_data = [
+#             {"time": record.get_time(), "value": record.get_value()}
+#             for table in result
+#             for record in table.records
+#         ]
+#         print(f"Data fetched locally: {len(latest_data)} points")
+#         time.sleep(60)
+
+# # Transférer les données vers l'InfluxDB OVH
+# def transfer_data():
+#     local_client = InfluxDBClient(url=local_url, token=local_token, org=local_org)
+#     remote_client = InfluxDBClient(url=remote_url, token=remote_token, org=remote_org)
+
+#     query = f'''
+#     from(bucket: "{local_bucket}")
+#       |> range(start: -1h)
+#     '''
+#     result = local_client.query_api().query(query, org=local_org)
+
+#     # Écrire directement les résultats récupérés dans l'InfluxDB OVH
+#     write_api = remote_client.write_api()
+#     write_api.write(bucket=remote_bucket, org=remote_org, record=result)
+#     print(f"Data transferred to remote InfluxDB: {len(result)} points")
