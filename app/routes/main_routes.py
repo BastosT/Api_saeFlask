@@ -26,7 +26,6 @@ def test():
     return jsonify({"message": "Hello World!"})
 
 
-
 @main_bp.route('/data', methods=['GET'])
 def get_data():
     try:
@@ -40,6 +39,31 @@ def get_data():
         current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
         return jsonify({"error": "Erreur interne du serveur"}), 500
     
+
+@main_bp.route('/data20', methods=['GET'])
+def get_all_data():
+    try:
+        # Requête pour récupérer toutes les données disponibles
+        query = 'from(bucket:"HA_Bucket") |> range(start: -7d)'
+        result = query_api.query(query)
+        
+        data = []
+        
+        # Parcours des résultats et ajout de toutes les colonnes disponibles
+        for table in result:
+            for record in table.records:
+                # `record.values` contient toutes les colonnes
+                record_data = dict(record.values)
+                # Ajoute également le champ `time`
+                record_data["time"] = record.get_time()
+                data.append(record_data)
+        
+        return jsonify(data)
+    except Exception as e:
+        # Log de l'erreur pour déboguer
+        current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
+        return jsonify({"error": "Erreur interne du serveur"}), 500
+
 
 # @app.route('/latest', methods=['GET'])
 # def get_latest():
