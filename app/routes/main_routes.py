@@ -31,7 +31,7 @@ def test():
 def get_data():
     try:
         # Requête pour récupérer les données
-        query = 'from(bucket:"HA_BUCKET") |> range(start: -7d)'
+        query = 'from(bucket:"HA_Bucket") |> range(start: -7d)'
         result = query_api.query(query)
         data = [{"time": record.get_time(), "value": record.get_value()} for table in result for record in table.records]
         return jsonify(data)
