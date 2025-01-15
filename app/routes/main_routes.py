@@ -61,30 +61,63 @@ def get_all_data():
 
 
 @main_bp.route('/data_7d', methods=['GET'])
-def get_humidity_values():
+def get_all_sensor_data():
     try:
         query = '''
         from(bucket:"groupe4")
             |> range(start: -7d)
-            |> filter(fn: (r) => r._field == "value")  // On ne prend que les champs "value"
-            |> last()  // On prend la dernière valeur
+            |> filter(fn: (r) => r._field == "value")
+            |> sort(columns: ["_time"])
         '''
         result = query_api.query(query)
         
         data = []
+        sensors = {}  # Pour regrouper les données par capteur
+        measurements = {}  # Pour regrouper les capteurs par type de mesure
+        
         for table in result:
             for record in table.records:
-                data.append({
-                    "sensor": record.values.get("entity_id"),
-                    "measurement": record.values.get("_measurement"),
-                    "value": record.get_value(),
-                    "time": record.get_time().strftime("%Y-%m-%d %H:%M:%S")
-                })
+                sensor_id = record.values.get('entity_id')
+                measurement = record.values.get('_measurement')
+                
+                sensor_data = {
+                    "value": float(record.get_value()),
+                    "time": record.get_time().timestamp(),
+                    "sensor_id": sensor_id,
+                    "unit": measurement
+                }
+                
+                # Grouper par capteur
+                if sensor_id not in sensors:
+                    sensors[sensor_id] = []
+                sensors[sensor_id].append(sensor_data)
+                
+                # Grouper par type de mesure
+                if measurement not in measurements:
+                    measurements[measurement] = {}
+                if sensor_id not in measurements[measurement]:
+                    measurements[measurement][sensor_id] = []
+                measurements[measurement][sensor_id].append(sensor_data)
+                
+                data.append(sensor_data)
         
-        return jsonify(data)
+        response = {
+            "sensors": list(sensors.keys()),  # Liste de tous les capteurs
+            "measurements": {  # Données regroupées par type de mesure
+                measurement: {
+                    "sensors": list(sensor_data.keys()),
+                    "data": sensor_data
+                }
+                for measurement, sensor_data in measurements.items()
+            },
+            "data_by_sensor": sensors,  # Données regroupées par capteur
+            "all_data": data  # Toutes les données mélangées
+        }
+        
+        return jsonify(response)
     except Exception as e:
-        current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
-        return jsonify({"error": "Erreur interne du serveur"}), 500
+        print(f"Erreur détaillée: {str(e)}")
+        return jsonify({"error": f"Erreur interne du serveur: {str(e)}"}), 500
 
 
 
