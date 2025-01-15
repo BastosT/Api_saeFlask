@@ -88,47 +88,49 @@ def get_humidity_values():
 
 
 
+@main_bp.route('/temperature_data', methods=['GET'])
+def get_temperature_data():
+    try:
+        query = '''
+        from(bucket:"groupe4")
+            |> range(start: -7d)
+            |> filter(fn: (r) => r._field == "value")
+            |> filter(fn: (r) => r._measurement == "°C")
+            |> filter(fn: (r) => r.entity_id =~ /.*temperature.*/)
+            |> sort(columns: ["_time"])
+        '''
+        result = query_api.query(query)
+        
+        data = []
+        sensors = {}  # Pour regrouper les données par capteur
+        
+        for table in result:
+            for record in table.records:
+                sensor_id = record.values.get('entity_id')
+                temp_data = {
+                    "temperature": float(record.get_value()),
+                    "time": record.get_time().timestamp(),
+                    "sensor_id": sensor_id
+                }
+                
+                if sensor_id not in sensors:
+                    sensors[sensor_id] = []
+                sensors[sensor_id].append(temp_data)
+                data.append(temp_data)
+        
+        response = {
+            "sensors": list(sensors.keys()),  # Liste des capteurs disponibles
+            "data_by_sensor": sensors,        # Données regroupées par capteur
+            "all_data": data                  # Toutes les données mélangées
+        }
+        
+        return jsonify(response)
+    except Exception as e:
+        print(f"Erreur détaillée: {str(e)}")
+        return jsonify({"error": f"Erreur interne du serveur: {str(e)}"}), 500
 
 
 
 
-
-
-
-
-
-
-
-# @app.before_first_request
-# def startup_event():
-#     def fetch_task():
-#         fetch_influx_data()
-
-#     def transfer_task():
-#         while True:
-#             transfer_data()
-#             time.sleep(300)  # Transfert toutes les 5 minutes
-
-#     # Thread pour récupérer les données
-#     thread_fetch = threading.Thread(target=fetch_task)
-#     thread_fetch.daemon = True
-#     thread_fetch.start()
-
-#     # Thread pour transférer les données
-#     thread_transfer = threading.Thread(target=transfer_task)
-#     thread_transfer.daemon = True
-#     thread_transfer.start()
-
-
-# @app.route("/data", methods=["GET"])
-# def get_data():
-#     try:
-#         if not latest_data:  # Vérifie si les données sont vides ou invalides
-#             return jsonify({"error": "No data available"}), 404
-#         return jsonify(latest_data)
-#     except Exception as e:
-#         # Capture et log les erreurs
-#         print(f"Error in get_data: {e}")  # Affiche l'erreur dans la console
-#         return jsonify({"error": "Internal server error"}), 500
 
 
