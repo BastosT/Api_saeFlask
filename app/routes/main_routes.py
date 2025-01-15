@@ -8,16 +8,21 @@ main_bp = Blueprint('main', __name__)
 
 
 # Connexion InfluxDB
-client = InfluxDBClient(url="http://10.103.1.44:5003/", token="IHZveuksmZNqpWjiUPELnbZFkjrkdOWLbTRgv4nS6zl43KRPUQvfVR_vw_yMV-vUL6O4Ckz2o1PI5mCcSaNE3A==", org="DomoCorp")  #token du groupe4 orga soit de l'iut ou du groupe4
-query_api = client.query_api()
+# client = InfluxDBClient(url="http://10.103.1.44:5003/", token="IHZveuksmZNqpWjiUPELnbZFkjrkdOWLbTRgv4nS6zl43KRPUQvfVR_vw_yMV-vUL6O4Ckz2o1PI5mCcSaNE3A==", org="DomoCorp")  #token du groupe4 orga soit de l'iut ou du groupe4
+# query_api = client.query_api()
 
+# connexion influxDB ovh 
+client = InfluxDBClient(url="http://51.83.36.122:8086", token="V5_uV4fxRIfcTbkek-HqftjwxxYsbh76t8p_j9_9b6bL0DYTv4rqoxOfj7Ng3gfnmkuYIk3in1pAbDUjomvzAw==", org="IUT-INFO")  #token du groupe4 orga soit de l'iut ou du groupe4
+query_api = client.query_api()
 
 @main_bp.route('/')
 def home():
     return jsonify({
         "message": "Bienvenue sur l'API",
         "routes_disponibles": {
-            "test": "/test"
+            "test": "/test",
+            "data" : "/data",
+            "data20" : "/data20"
         }
     })
 
@@ -26,51 +31,62 @@ def test():
     return jsonify({"message": "Hello World!"})
 
 
-@main_bp.route('/data', methods=['GET'])
-def get_data():
-    try:
-        # Requête pour récupérer les données
-        query = 'from(bucket:"HA_Bucket") |> range(start: -7d)'
-        result = query_api.query(query)
-        data = [{"time": record.get_time(), "value": record.get_value()} for table in result for record in table.records]
-        return jsonify(data)
-    except Exception as e:
-        # Log de l'erreur pour déboguer
-        current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
-        return jsonify({"error": "Erreur interne du serveur"}), 500
-    
 
-@main_bp.route('/data20', methods=['GET'])
+@main_bp.route('/data_1d', methods=['GET'])
 def get_all_data():
     try:
-        # Requête pour récupérer toutes les données disponibles
-        query = 'from(bucket:"HA_Bucket") |> range(start: -7d)'
+        query = '''
+        from(bucket:"groupe4")
+            |> range(start: -1d)
+            |> filter(fn: (r) => r._field == "value")  // On ne prend que les champs "value"
+            |> last()  // On prend la dernière valeur
+        '''
         result = query_api.query(query)
         
         data = []
-        
-        # Parcours des résultats et ajout de toutes les colonnes disponibles
         for table in result:
             for record in table.records:
-                # `record.values` contient toutes les colonnes
-                record_data = dict(record.values)
-                # Ajoute également le champ `time`
-                record_data["time"] = record.get_time()
-                data.append(record_data)
+                data.append({
+                    "sensor": record.values.get("entity_id"),
+                    "measurement": record.values.get("_measurement"),
+                    "value": record.get_value(),
+                    "time": record.get_time().strftime("%Y-%m-%d %H:%M:%S")
+                })
         
         return jsonify(data)
     except Exception as e:
-        # Log de l'erreur pour déboguer
         current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
         return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
-# @app.route('/latest', methods=['GET'])
-# def get_latest():
-#     query = 'from(bucket:"votre_bucket") |> range(start: -1h)'
-#     result = query_api.query(query)
-#     data = [{"time": record.get_time(), "value": record.get_value()} for table in result for record in table.records]
-#     return jsonify(data)
+
+@main_bp.route('/data_7d', methods=['GET'])
+def get_humidity_values():
+    try:
+        query = '''
+        from(bucket:"groupe4")
+            |> range(start: -7d)
+            |> filter(fn: (r) => r._field == "value")  // On ne prend que les champs "value"
+            |> last()  // On prend la dernière valeur
+        '''
+        result = query_api.query(query)
+        
+        data = []
+        for table in result:
+            for record in table.records:
+                data.append({
+                    "sensor": record.values.get("entity_id"),
+                    "measurement": record.values.get("_measurement"),
+                    "value": record.get_value(),
+                    "time": record.get_time().strftime("%Y-%m-%d %H:%M:%S")
+                })
+        
+        return jsonify(data)
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des données : {e}")
+        return jsonify({"error": "Erreur interne du serveur"}), 500
+
+
 
 
 
